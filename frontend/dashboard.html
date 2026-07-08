@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>智慧交通视觉感知系统</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand-block">
+        <div class="brand-mark">
+          <span></span>
+          <span></span>
+        </div>
+        <div>
+          <div class="brand-title">TrafficVision</div>
+          <div class="brand-subtitle">云边端协同感知平台</div>
+        </div>
+      </div>
+
+      <nav class="nav-list" aria-label="主导航">
+        <button class="nav-item active" data-section="overview"><i></i><span>综合态势</span></button>
+        <button class="nav-item" data-section="plate"><i></i><span>车牌识别</span></button>
+        <button class="nav-item" data-section="congestion"><i></i><span>拥堵热力</span></button>
+        <button class="nav-item" data-section="parking"><i></i><span>禁停跟踪</span></button>
+        <button class="nav-item" data-section="anomaly"><i></i><span>道路异常</span></button>
+        <button class="nav-item" data-section="devices"><i></i><span>设备管理</span></button>
+        <button class="nav-item" data-section="models"><i></i><span>模型管理</span></button>
+        <button class="nav-item" data-section="history"><i></i><span>历史统计</span></button>
+      </nav>
+
+      <div class="node-card compact">
+        <div class="node-title">项目节点分工</div>
+        <div class="node-row"><span class="dot online"></span><b>田浩阳手机</b><em>边端采集 / Tailscale</em></div>
+        <div class="node-row"><span class="dot online"></span><b>李俊发电脑</b><em>Electron + Python 接收分析</em></div>
+        <div class="node-row"><span class="dot warn"></span><b>韩尚恩电脑</b><em>YOLO 训练 / ONNX 产出</em></div>
+      </div>
+    </aside>
+
+    <main class="main-area">
+      <header class="topbar">
+        <div>
+          <div class="eyebrow">Smart Traffic Visual Sensing System</div>
+          <h1>智慧交通视觉感知控制台</h1>
+        </div>
+        <div class="topbar-actions">
+          <div class="status-pill success"><span></span>视频流已连接</div>
+          <div class="status-pill"><span></span>Tailscale 虚拟局域网</div>
+          <button class="ghost-button" id="resetMockBtn">重置模拟数据</button>
+        </div>
+      </header>
+
+      <section class="control-strip workflow-strip">
+        <div class="control-group wide">
+          <label>手机视频流地址</label>
+          <input id="cameraUrlInput" class="control-input" value="http://100.70.11.30:8080/video" placeholder="例如：http://100.70.11.30:8080/video" />
+        </div>
+        <div class="control-group wide">
+          <label>本地视频文件</label>
+          <input id="videoFilePath" class="control-input" readonly placeholder="请选择一个 mp4/avi/mov 视频文件" />
+        </div>
+        <div class="workflow-buttons">
+          <button class="ghost-button" id="chooseVideoBtn">选择视频</button>
+          <button class="primary-button" id="startVideoBtn">本地视频全流程检测</button>
+          <button class="primary-button" id="startCameraBtn">连接手机实时检测</button>
+          <button class="danger-button" id="stopWorkflowBtn">停止</button>
+          <button class="ghost-button" id="restartBackendBtn">重启后端</button>
+        </div>
+      </section>
+
+      <section class="kpi-grid">
+        <article class="kpi-card">
+          <div class="kpi-label">今日检测车牌</div>
+          <div class="kpi-value" id="plateCount">0</div>
+          <div class="kpi-trend up">+12.4% 较上一时段</div>
+        </article>
+        <article class="kpi-card">
+          <div class="kpi-label">实时车辆目标</div>
+          <div class="kpi-value" id="vehicleCount">0</div>
+          <div class="kpi-trend">沙盘主干道 / 闸机区</div>
+        </article>
+        <article class="kpi-card danger">
+          <div class="kpi-label">违规停车告警</div>
+          <div class="kpi-value" id="parkingAlerts">0</div>
+          <div class="kpi-trend down">阈值：30 秒</div>
+        </article>
+        <article class="kpi-card warn">
+          <div class="kpi-label">道路异常事件</div>
+          <div class="kpi-value" id="anomalyCount">0</div>
+          <div class="kpi-trend">异物 / 占道 / 掉落物</div>
+        </article>
+      </section>
+
+      <section class="dashboard-grid">
+        <article class="panel video-panel" data-panel="overview plate congestion parking anomaly">
+          <div class="panel-header">
+            <div>
+              <h2>实时视频分析画面</h2>
+              <p>已接入 Python 后端：best(1).onnx ONNXRuntime 检测车牌框 → OCR 每秒补票 → 多帧投票纠错</p>
+            </div>
+            <div class="mini-metrics">
+              <span id="fpsBadge">FPS 28</span>
+              <span id="latencyBadge">Latency 76ms</span>
+              <span>1080P</span>
+            </div>
+          </div>
+
+          <div class="video-stage" id="videoStage">
+            <img id="liveFeed" class="live-feed hidden" alt="实时车牌检测画面" />
+            <div class="road-scene" id="mockRoadScene">
+              <div class="lane lane-1"></div>
+              <div class="lane lane-2"></div>
+              <div class="lane lane-3"></div>
+              <div class="gate-zone">闸机区域</div>
+              <div class="no-parking-zone">禁停区域</div>
+              <div class="vehicle-box car-a" data-label="CAR 92%"></div>
+              <div class="vehicle-box car-b" data-label="CAR 88%"></div>
+              <div class="vehicle-box car-c" data-label="TRUCK 81%"></div>
+              <div class="plate-box" data-label="粤B·7Q3A2 / 白名单"></div>
+              <div class="anomaly-marker" data-label="异常物体"></div>
+              <div class="tracking-line"></div>
+            </div>
+            <div class="video-hud top-left">
+              <strong id="liveModeLabel">READY</strong>
+              <span id="streamAddress">等待启动检测工作流</span>
+            </div>
+            <div class="video-hud bottom-right">
+              <span>Plate OCR: 异步</span>
+              <span>YOLO ONNX: 实测</span>
+              <span>Track ID: #A17</span>
+            </div>
+          </div>
+        </article>
+
+        <article class="panel heatmap-panel" data-panel="overview congestion">
+          <div class="panel-header">
+            <div>
+              <h2>拥堵热力图</h2>
+              <p>按区域统计车辆密度，动态绘制拥堵态势</p>
+            </div>
+            <div class="severity medium" id="congestionLevel">中度拥堵</div>
+          </div>
+          <div class="canvas-wrap">
+            <canvas id="heatmapCanvas" width="520" height="310"></canvas>
+            <div class="heatmap-legend">
+              <span>低</span><i></i><span>高</span>
+            </div>
+          </div>
+        </article>
+
+        <article class="panel plate-panel" data-panel="overview plate">
+          <div class="panel-header">
+            <div>
+              <h2>车牌识别与白名单比对</h2>
+              <p>车牌检测框 → ROI 裁剪 → OCR → 白名单决策</p>
+            </div>
+            <div class="status-pill success small"><span></span>闸机策略：自动放行/拦截</div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>时间</th><th>车牌</th><th>置信度</th><th>名单状态</th><th>决策</th></tr>
+              </thead>
+              <tbody id="plateTable"></tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="panel parking-panel" data-panel="overview parking">
+          <div class="panel-header">
+            <div>
+              <h2>禁停区域车辆跟踪</h2>
+              <p>持续跟踪进入禁停 ROI 的车辆，超过阈值触发告警</p>
+            </div>
+            <div class="status-pill warn small"><span></span>阈值 30s</div>
+          </div>
+          <div class="tracking-list" id="trackingList"></div>
+        </article>
+
+        <article class="panel anomaly-panel" data-panel="overview anomaly">
+          <div class="panel-header">
+            <div>
+              <h2>道路异常检测</h2>
+              <p>检测异常物体、占道、掉落物，并标注受影响车道</p>
+            </div>
+            <div class="status-pill danger small"><span></span>实时告警</div>
+          </div>
+          <div class="event-feed" id="eventFeed"></div>
+        </article>
+
+        <article class="panel system-panel" data-panel="overview devices">
+          <div class="panel-header">
+            <div>
+              <h2>系统管理与运行监控</h2>
+              <p>CPU / GPU / 内存 / 拉流状态 / 推理吞吐</p>
+            </div>
+          </div>
+          <div class="resource-grid">
+            <div class="resource-item"><span>CPU</span><b id="cpuVal">0%</b><div><i id="cpuBar"></i></div></div>
+            <div class="resource-item"><span>GPU</span><b id="gpuVal">0%</b><div><i id="gpuBar"></i></div></div>
+            <div class="resource-item"><span>内存</span><b id="memVal">0%</b><div><i id="memBar"></i></div></div>
+            <div class="resource-item"><span>视频传输</span><b id="streamVal">稳定</b><div><i id="streamBar"></i></div></div>
+          </div>
+        </article>
+
+        <article class="panel device-panel" data-panel="devices overview">
+          <div class="panel-header">
+            <div>
+              <h2>边缘设备注册与在线状态</h2>
+              <p>管理手机、沙盘摄像头、分析节点和展示节点</p>
+            </div>
+          </div>
+          <div class="device-grid" id="deviceGrid"></div>
+        </article>
+
+        <article class="panel model-panel" data-panel="models overview">
+          <div class="panel-header">
+            <div>
+              <h2>模型管理</h2>
+              <p>模型选择、参数配置、PT 推理状态与 OCR 预加载状态</p>
+            </div>
+          </div>
+          <div class="model-list" id="modelList"></div>
+        </article>
+
+        <article class="panel history-panel" data-panel="history overview">
+          <div class="panel-header">
+            <div>
+              <h2>数据统计与历史趋势</h2>
+              <p>车牌数、拥堵度、违规停车、道路异常随时间变化</p>
+            </div>
+            <div class="mini-metrics"><span>近 12 分钟</span></div>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="trendCanvas" width="980" height="320"></canvas>
+          </div>
+        </article>
+      </section>
+    </main>
+  </div>
+
+  <script src="./renderer.js"></script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+---
+message: "Add vehicle IoU tracker and integrate vehicle detection into backend"
+branch: "feature/vehicle-tracking-iou"
+files:
+- path: backend/vehicle_tracker.py
+  mode: null
+  content: "(already added above)"

@@ -1,0 +1,59 @@
+# Python 虚拟环境
+.venv
+venv
+env
+ENV
+
+# Python 缓存
+__pycache__
+.pyc
+.pyo
+.pyd
+
+# Node.js 依赖
+node_modules
+dist
+build
+.log
+
+# 数据文件（大文件）
+dataset
+models
+cache
+runtime_data
+install_logs
+road_anomaly_data
+
+# 视频和压缩包（改用网盘）
+.mp4
+.avi
+.mov
+.zip
+.tar.gz
+.rar
+.7z
+
+# 模型权重文件
+.pth
+.ckpt
+.pt
+.h5
+.pb
+.onnx
+
+# 配置文件（含敏感信息）
+.env
+config.local.
+.pkl
+
+# IDE 和系统文件
+.vscode
+.idea
+.swp
+.swo
+.DS_Store
+Thumbs.db
+
+# 临时文件
+.tmp
+.temp

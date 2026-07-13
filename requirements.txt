@@ -1,0 +1,14 @@
+# 智慧交通视觉感知系统
+# 推荐 Python 3.12 x64；也兼容 Python 3.13 x64。
+# 不建议使用 Python 3.14，因为当前 PaddlePaddle/PaddleOCR 尚未正式支持。
+#
+# onnxruntime / onnxruntime-gpu、paddlepaddle / paddlepaddle-gpu
+# 由一键安装器根据显卡和 CUDA 环境自动安装。
+
+numpy>=1.26.4,<2.0
+opencv-python>=4.10,<5
+fastapi>=0.115,<1
+uvicorn[standard]>=0.30,<1
+pydantic>=2.8,<3
+Pillow>=10.4,<13
+paddleocr==3.7.0

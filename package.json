@@ -1,0 +1,25 @@
+{
+  "name": "smart-traffic-vision-electron",
+  "version": "0.3.0",
+  "description": "云边端协同智慧交通视觉感知系统 Electron + Python ONNX 并行车牌识别版",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron ."
+  },
+  "keywords": [
+    "electron",
+    "smart-traffic",
+    "vision",
+    "yolo",
+    "onnx",
+    "license-plate"
+  ],
+  "author": "Smart Traffic Team",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^37.2.0"
+  }
+}
+
+

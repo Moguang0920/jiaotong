@@ -1,0 +1,21 @@
+智慧交通综合实时检测页面补丁
+
+覆盖目录：
+1. backend/plate_runtime_backend.py
+2. frontend/dashboard.html
+3. frontend/renderer.js
+4. frontend/styles.css
+
+本版核心行为：
+- 车牌识别、拥堵热力、禁停跟踪、道路异常全部回到“综合实时检测”同一页面。
+- 顶部模型下拉框切换 best(1).onnx / hearmap.onnx / stop.onnx / normal.onnx。
+- 手机视频只在点击“连接手机”时建立一次 VideoCapture。
+- 模型切换不会调用 stop_current_worker，不会清空 source/latest_frame，也不会重新连接手机。
+- 切换时只短暂停止 YOLO 推理，加载并替换 ONNX Session；视频读取线程与 MJPEG 显示继续运行。
+- 前端状态轮询不会重复修改 liveFeed.src，避免浏览器反复重连 MJPEG。
+- 道路 ROI 预览优先复用当前视频最新帧；确认 ROI 后可运行中下发，不重新连接手机。
+- 四个业务面板同时显示，当前模型对应面板会高亮。
+- 保留上一版车牌格式过滤、短时关联投票以及热力图无淡出逻辑。
+
+使用：
+关闭 Electron 程序，按上述相对路径覆盖文件，然后重新 npm start。

@@ -1,0 +1,44 @@
+智慧交通视觉感知系统依赖清单
+================================
+
+推荐运行环境
+- Windows 10/11 x64
+- Python 3.12 x64（安装器优先使用）
+- Python 3.13 x64（兼容备用）
+- Node.js LTS
+- NVIDIA 显卡：推荐使用最新稳定驱动
+
+Python 直接依赖
+- numpy
+- opencv-python
+- fastapi
+- uvicorn[standard]
+- pydantic
+- Pillow
+- paddleocr 3.7.0
+
+推理引擎（安装器自动选择）
+GPU:
+- onnxruntime-gpu 1.27.0
+- onnxruntime-gpu[cuda,cudnn] 所需 NVIDIA CUDA/cuDNN Python 运行库
+- paddlepaddle-gpu 3.3.0（根据 nvidia-smi 选择 cu118/cu126/cu129/cu130）
+
+CPU 回退:
+- onnxruntime 1.27.0
+- paddlepaddle 3.3.0
+
+Node/Electron
+- electron 37.2.0（由 package-lock.json + npm ci 安装）
+
+Python 标准库，无需 pip
+- sqlite3
+- tkinter
+- pathlib
+- threading
+- queue
+- hashlib
+- uuid
+- json
+- base64
+- dataclasses
+- typing

@@ -6,7 +6,7 @@ OUTPUT_FILE = "all_code_content.txt"
 # 需要提取内容的代码后缀
 TARGET_EXTS = {".py", ".js", ".html", ".css", ".json"}
 # 忽略的文件夹，不会进入遍历
-IGNORE_FOLDERS = {".venv", "node_modules", "__pycache__"}
+IGNORE_FOLDERS = {".venv", "node_modules", "__pycache__", ".venv_ocr"}
 
 # 存储所有匹配文件
 match_files = []

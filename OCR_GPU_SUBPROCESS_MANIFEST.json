@@ -1,0 +1,62 @@
+{
+  "version": "2026-07-14-OCR-GPU-SUBPROCESS-V6",
+  "source": "all_code_content(14).txt",
+  "architecture": {
+    "main_process": "PyTorch + ONNX Runtime CUDA",
+    "ocr_process": "Dedicated .venv_ocr + PaddlePaddle GPU",
+    "transport": "JSON lines over stdin/stdout",
+    "startup": "ONNX and OCR subprocess preload concurrently"
+  },
+  "files": [
+    {
+      "path": "README_OCR_GPU_Subprocess_V6.txt",
+      "size": 1512,
+      "sha256": "34d3d0ce0170dd9c56c3cf455d67dbed10cfc31cade6200d87649a54a622947d"
+    },
+    {
+      "path": "backend/paddle_ocr_gpu_worker.py",
+      "size": 7692,
+      "sha256": "c51aefec0260e432017dfcce38b005ca3f4aeed6fe32c7f648485213a486890f"
+    },
+    {
+      "path": "backend/plate_runtime_backend.py",
+      "size": 207544,
+      "sha256": "17d5aa562355519fb0b228dc28dba19943c648c327ee0d6a7a7f79e0cdb9a8e1"
+    },
+    {
+      "path": "frontend/renderer.js",
+      "size": 99209,
+      "sha256": "0e1dcb917dcd9891b4ce47210bf71aa10083b5fac9c82ec89cee3769fce057a3"
+    },
+    {
+      "path": "setup_paddleocr_gpu_subprocess.bat",
+      "size": 2292,
+      "sha256": "5c94d1c61b575e282392395f39c2d540d70730663f13deae34abe3436ff1c721"
+    },
+    {
+      "path": "tools/install_environment.py",
+      "size": 12515,
+      "sha256": "ce72f14d942b00eb1e61180499242119355537a18a1d758217379f4014e8c6da"
+    },
+    {
+      "path": "tools/preload_ocr_model.py",
+      "size": 2296,
+      "sha256": "4c9d7ffd22b16a56f04cd7dda4bd01856d0a9558542339154c5134bd1f8f7000"
+    },
+    {
+      "path": "tools/verify_dual_gpu_processes.py",
+      "size": 5740,
+      "sha256": "62a92f297d9243554a7cdd47d1cf10f4333f8acefe31efebb87d0835acbc5d00"
+    },
+    {
+      "path": "tools/verify_environment.py",
+      "size": 6887,
+      "sha256": "1d5768126b8ea230036a0be0b3d3427907c583af05c9d917b476f4dcacc7562b"
+    },
+    {
+      "path": "verify_ocr_gpu_subprocess_integration.py",
+      "size": 1560,
+      "sha256": "fa6552d0a192ed54c62a2ad64441d55b366e548a230bab4866251dbf1034205b"
+    }
+  ]
+}

@@ -14,6 +14,7 @@ from typing import Iterable, Optional
 
 ROOT = Path(__file__).resolve().parents[1]
 VENV_DIR = ROOT / ".venv"
+OCR_VENV_DIR = ROOT / ".venv_ocr"
 LOG_DIR = ROOT / "install_logs"
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 LOG_PATH = LOG_DIR / f"install_{dt.datetime.now():%Y%m%d_%H%M%S}.log"
@@ -230,6 +231,73 @@ def install_paddle_cpu(python_exe: Path) -> None:
     )
 
 
+
+def install_ocr_gpu_subprocess_env(
+    main_python: Path,
+    cuda_version: Optional[float],
+) -> tuple[bool, str]:
+    """创建只包含 PaddleOCR GPU 的独立虚拟环境。"""
+    log(f"创建 PaddleOCR GPU 独立环境：{OCR_VENV_DIR}")
+    if not OCR_VENV_DIR.exists():
+        run([str(main_python), "-m", "venv", str(OCR_VENV_DIR)])
+
+    ocr_python = OCR_VENV_DIR / "Scripts" / "python.exe"
+    if not ocr_python.exists():
+        return False, ""
+
+    pip(
+        ocr_python,
+        "install",
+        "--upgrade",
+        "pip",
+        "wheel",
+        "setuptools<82",
+    )
+    pip(
+        ocr_python,
+        "uninstall",
+        "-y",
+        "paddlepaddle",
+        "paddlepaddle-gpu",
+        check=False,
+    )
+
+    paddle_ok, paddle_tag = install_paddle_gpu(
+        ocr_python,
+        cuda_version,
+    )
+    if not paddle_ok:
+        return False, ""
+
+    pip(
+        ocr_python,
+        "install",
+        "--upgrade",
+        "--no-cache-dir",
+        "numpy==1.26.4",
+        "opencv-python-headless==4.10.0.84",
+        "paddleocr>=3.3.0,<4",
+    )
+
+    test = run(
+        [
+            str(ocr_python),
+            "-c",
+            (
+                "import paddle;"
+                "print('paddle=',paddle.__version__);"
+                "print('cuda=',paddle.device.is_compiled_with_cuda());"
+                "print('count=',paddle.device.cuda.device_count());"
+                "paddle.set_device('gpu:0');"
+                "print('device=',paddle.get_device())"
+            ),
+        ],
+        check=False,
+    )
+    return test.returncode == 0, paddle_tag
+
+
+
 def find_npm() -> Optional[str]:
     found = shutil.which("npm")
     if found:
@@ -321,19 +389,18 @@ def main() -> int:
             use_gpu = False
             paddle_tag = "cpu"
         else:
-            paddle_ok, paddle_tag = install_paddle_gpu(python_exe, cuda_version)
-            if not paddle_ok:
-                log("Paddle GPU 安装失败；YOLO 保持 GPU，OCR 回退 Paddle CPU。")
-                pip(
-                    python_exe,
-                    "uninstall",
-                    "-y",
-                    "paddlepaddle",
-                    "paddlepaddle-gpu",
-                    check=False,
+            log(
+                "ONNX Runtime 在主 .venv 使用 GPU；"
+                "PaddleOCR 在 .venv_ocr 独立进程使用 GPU。"
+            )
+            ocr_ok, paddle_tag = install_ocr_gpu_subprocess_env(
+                python_exe,
+                cuda_version,
+            )
+            if not ocr_ok:
+                raise RuntimeError(
+                    "PaddleOCR GPU 独立环境安装或验证失败。"
                 )
-                install_paddle_cpu(python_exe)
-                paddle_tag = "cpu"
     else:
         log("使用 CPU 安装模式。")
         install_onnx_cpu(python_exe)

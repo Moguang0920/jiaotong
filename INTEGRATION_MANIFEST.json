@@ -1,0 +1,52 @@
+{
+  "version": "2026-07-14-LIVE-BASELINE-INTEGRATION-V1",
+  "files": [
+    {
+      "path": "README_道路异常实时集成替换说明.txt",
+      "size": 1913,
+      "sha256": "f384b5cd9094981dba75fb357749a6399def6a8bc965df1177479e79fcbff9b6"
+    },
+    {
+      "path": "backend/normal_lane_detector.py",
+      "size": 29099,
+      "sha256": "f74bc3073078283fcd3a41473482f4bc3fb526defd9a5bc384f4ec0aa0104881"
+    },
+    {
+      "path": "backend/plate_runtime_backend.py",
+      "size": 184079,
+      "sha256": "45e974d07c2629ea93551ebd3d73a4c9e0c14e3b54b1a7d32ad420ea4a24e4cb"
+    },
+    {
+      "path": "backend/runtime_road_anomaly_detector.py",
+      "size": 44363,
+      "sha256": "97b9b0f9e998188de021a635e1bfffc6196a59c73d030d14fbea7fde434c865f"
+    },
+    {
+      "path": "frontend/dashboard.html",
+      "size": 20390,
+      "sha256": "39f7535febea38dae99b68194f33cab39e044e2d4279be8d1b8b7e23860294c9"
+    },
+    {
+      "path": "frontend/renderer.js",
+      "size": 94873,
+      "sha256": "4a64a8b2d72f514f3cd64ca90b98a4c8d4e1b7d739e813ee00bd549da62a6b55"
+    },
+    {
+      "path": "frontend/styles.css",
+      "size": 42490,
+      "sha256": "9c3c4c45194b2896abe26b7445db92620f9a01e201bea86d69e8b27d67a291bc"
+    },
+    {
+      "path": "verify_road_anomaly_integration.py",
+      "size": 2010,
+      "sha256": "c39cf07b2ba6d8ef86b6be25f19032a81a2f4c2d0e17ae6f443fc35fe42d8074"
+    }
+  ],
+  "patch_version": "2026-07-14-runtime-integration-fix-v2",
+  "fixes": [
+    "PyTorch CUDA is initialized before ONNX Runtime DLL preload to prevent cudnn_cnn64_9.dll WinError 127.",
+    "PaddleOCR initializes only for plate mode and only once per process.",
+    "Model loading is serialized to prevent concurrent PaddleX/ONNX initialization.",
+    "Non-plate modes no longer require OCR readiness."
+  ]
+}

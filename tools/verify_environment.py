@@ -60,8 +60,6 @@ def main() -> int:
         "pydantic": "pydantic",
         "Pillow": "PIL",
         "onnxruntime": "onnxruntime",
-        "paddle": "paddle",
-        "paddleocr": "paddleocr",
         "uvicorn": "uvicorn",
     }
 
@@ -89,24 +87,50 @@ def main() -> int:
         except Exception as exc:
             warnings.append(f"读取 ONNX Runtime Provider 失败：{exc}")
 
-    paddle = loaded.get("paddle")
-    if paddle is not None:
-        try:
-            compiled_cuda = bool(paddle.device.is_compiled_with_cuda())
-            device_count = int(paddle.device.cuda.device_count()) if compiled_cuda else 0
-            report["gpu"]["paddle_compiled_with_cuda"] = compiled_cuda
-            report["gpu"]["paddle_cuda_device_count"] = device_count
-            print(f"[Paddle] CUDA 编译: {compiled_cuda}, GPU 数量: {device_count}")
-            if not compiled_cuda:
-                warnings.append("PaddleOCR 使用 CPU；这不影响 ONNX YOLO 使用 GPU。")
-        except Exception as exc:
-            warnings.append(f"读取 Paddle GPU 状态失败：{exc}")
-
-    try:
-        from paddleocr import TextRecognition  # noqa: F401
-        print("[OK] PaddleOCR TextRecognition API 可用")
-    except Exception as exc:
-        errors.append(f"PaddleOCR TextRecognition API 不可用：{exc}")
+    # PaddleOCR 不允许在主检查进程中直接 import。
+    # 使用 OCR 专用虚拟环境启动独立进程进行验证。
+    ocr_python = ROOT / ".venv_ocr" / "Scripts" / "python.exe"
+    ocr_worker = ROOT / "backend" / "paddle_ocr_gpu_worker.py"
+    report["gpu"]["ocr_python"] = str(ocr_python)
+    if not ocr_python.exists():
+        errors.append(
+            f"缺少 PaddleOCR 独立环境：{ocr_python}。"
+            "请运行 setup_paddleocr_gpu_subprocess.bat。"
+        )
+    elif not ocr_worker.exists():
+        errors.append(f"缺少 OCR 子进程脚本：{ocr_worker}")
+    else:
+        ocr_check = subprocess.run(
+            [
+                str(ocr_python),
+                "-c",
+                (
+                    "import paddle;"
+                    "print('version='+str(paddle.__version__));"
+                    "print('cuda='+str(paddle.device.is_compiled_with_cuda()));"
+                    "print('count='+str(paddle.device.cuda.device_count()));"
+                    "paddle.set_device('gpu:0');"
+                    "print('device='+str(paddle.get_device()))"
+                ),
+            ],
+            cwd=str(ROOT),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=60,
+        )
+        report["gpu"]["paddle_subprocess_output"] = (
+            (ocr_check.stdout or "") + (ocr_check.stderr or "")
+        ).strip()
+        if ocr_check.returncode != 0:
+            errors.append(
+                "PaddleOCR GPU 独立环境验证失败："
+                + report["gpu"]["paddle_subprocess_output"]
+            )
+        else:
+            print("[Paddle subprocess OK]")
+            print(ocr_check.stdout.strip())
 
     model_groups = {
         "plate": ["best(1).onnx", "best.onnx"],

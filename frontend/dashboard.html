@@ -84,13 +84,14 @@
         <div class="normal-roi-controls hidden" id="normalRoiControls">
           <div class="normal-roi-copy">
             <b>道路异常检测区域</b>
-            <span>可直接复用当前视频帧圈选道路区域；确认后无需重连手机，下一帧开始 normal.onnx 分析。</span>
+            <span>固定机位后从当前视频帧选择严格四点 ROI；确认后车道线和道路异常共用该区域，并实时采集新的正常道路基准。</span>
           </div>
           <select id="normalRoiSourceSelect" class="control-input normal-roi-source">
             <option value="file" selected>从本地视频第一帧选择</option>
             <option value="camera">从手机视频流当前帧选择</option>
           </select>
-          <button class="ghost-button normal-roi-button" id="selectNormalRoiBtn">选择道路区域</button>
+          <button class="ghost-button normal-roi-button" id="selectNormalRoiBtn">选择四点道路区域</button>
+          <button class="ghost-button normal-baseline-button" id="rebuildNormalBaselineBtn">重新采集正常基准</button>
           <span class="normal-roi-status" id="normalRoiStatus">尚未选择 ROI</span>
         </div>
       </section>
@@ -155,6 +156,50 @@
             <div class="video-hud bottom-right">
               <span id="runtimeModelHud">Plate OCR：异步投票</span>
               <span>YOLO ONNX：实时推理</span>
+            </div>
+          </div>
+
+          <div class="normal-visual-diagnostics" id="normalVisualDiagnostics">
+            <div class="normal-diagnostic-heading">
+              <div>
+                <h3>道路辅助视图</h3>
+                <p>主画面只保留道路异常物体；车道线与差分结果移到下方单独显示。</p>
+              </div>
+              <div class="normal-diagnostic-legend">
+                <span class="lane-legend-dot"></span>车道线
+                <span class="road-legend-dot"></span>道路差分
+                <span class="anomaly-legend-dot"></span>异常区域
+              </div>
+            </div>
+
+            <div class="normal-diagnostic-grid">
+              <section class="normal-diagnostic-card">
+                <div class="normal-diagnostic-card-head">
+                  <div>
+                    <b>车道线独立视图</b>
+                    <span>复用主视频帧，仅在此处绘制四点 ROI、候选线段和稳定车道线。</span>
+                  </div>
+                  <em id="normalLaneAssistBadge">等待车道线</em>
+                </div>
+                <div class="normal-lane-stage" id="normalLaneStage">
+                  <canvas id="normalLaneCanvas"></canvas>
+                  <div class="normal-diagnostic-empty" id="normalLaneEmpty">启动 normal.onnx 并确认四点 ROI 后显示。</div>
+                </div>
+              </section>
+
+              <section class="normal-diagnostic-card">
+                <div class="normal-diagnostic-card-head">
+                  <div>
+                    <b>道路差分 / 异常投票图</b>
+                    <span>保留 multi-reference 脚本的辅助图：蓝色为低差异道路/车辆忽略区，红色为异常投票区域。</span>
+                  </div>
+                  <em id="normalMaskAssistBadge">等待差分</em>
+                </div>
+                <div class="normal-mask-stage">
+                  <img id="normalAnomalyMaskFeed" alt="道路差分与异常投票辅助图" />
+                  <div class="normal-diagnostic-empty" id="normalMaskEmpty">正常道路基准采集完成后显示实时差分图。</div>
+                </div>
+              </section>
             </div>
           </div>
         </article>
@@ -239,7 +284,7 @@
           </div>
           <div class="normal-road-runtime" id="normalRoadRuntime">
             <div class="normal-road-runtime-title">正常道路模式状态</div>
-            <div class="normal-road-runtime-body">选择 normal.onnx 后，先圈选道路 ROI，再启动视频检测。</div>
+            <div class="normal-road-runtime-body">选择 normal.onnx 后，固定摄像头、选择四点道路 ROI；系统会先实时采集正常道路基准，再同时绘制车道线并检测异常物品。</div>
           </div>
           <div class="event-feed" id="eventFeed"></div>
         </article>
@@ -355,13 +400,13 @@
       <div class="normal-roi-dialog-header">
         <div>
           <h2>选择正常道路区域</h2>
-          <p>沿实际道路边界依次点击多个点。左键添加，使用下方按钮撤销或清空，至少 3 个点后确认。</p>
+          <p>沿实际道路边界依次点击严格 4 个点。四点确认后，车道线绘制与道路异常检测会共用该区域。</p>
         </div>
         <button class="normal-roi-close" id="normalRoiCloseBtn" aria-label="关闭">×</button>
       </div>
       <div class="normal-roi-canvas-shell">
         <canvas id="normalRoiCanvas" width="1280" height="720"></canvas>
-        <div class="normal-roi-tip" id="normalRoiTip">正在读取预览帧...</div>
+        <div class="normal-roi-tip" id="normalRoiTip">正在读取当前视频帧，请准备选择 4 个点...</div>
       </div>
       <div class="normal-roi-dialog-footer">
         <div class="normal-roi-point-count" id="normalRoiPointCount">已选择 0 个点</div>

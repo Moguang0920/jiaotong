@@ -24,7 +24,7 @@ const DETECTOR_UI = {
   },
   normal: {
     title: '道路异常实时检测画面',
-    description: 'normal.onnx 与手动道路 ROI 联动；圈选 ROI 时直接复用当前视频帧，不重新连接手机。',
+    description: '主视频只突出道路异常物体；车道线与蓝/红差分辅助图已移到主画面下方独立显示。',
     hud: 'Road ROI：异常检测',
     action: '道路异常检测'
   }
@@ -136,8 +136,36 @@ const state = {
     roi_ready: false,
     normal_vehicle_count: 0,
     stable_lane_count: 0,
-    message: '选择 normal.onnx 后配置道路 ROI。'
+    baseline_status: 'waiting_roi',
+    baseline_count: 0,
+    baseline_target: 12,
+    baseline_progress: 0,
+    anomaly_candidate_count: 0,
+    anomaly_confirmed_count: 0,
+    anomaly_total_events: 0,
+    message: '选择 normal.onnx 后配置四点道路 ROI。'
   },
+  normalAnomaly: {
+    enabled: false,
+    status: 'waiting_roi',
+    baseline_count: 0,
+    baseline_target: 12,
+    baseline_progress: 0,
+    baseline_ready: false,
+    candidate_count: 0,
+    confirmed_count: 0,
+    total_confirmed_events: 0,
+    candidates: [],
+    confirmed: [],
+    tracks: [],
+    processing_ms: 0,
+    message: '等待四点 ROI。'
+  },
+  normalAnomalyEventKeys: new Set(),
+  normalAnomalySessionId: '',
+  normalDebugBusy: false,
+  normalDebugObjectUrl: '',
+  normalDebugLastUpdate: 0,
   heatField: null,
   heatFieldCols: 72,
   heatFieldRows: 44,
@@ -277,7 +305,7 @@ async function switchDetectorModel(nextModel) {
     state.detectorModel = data.detector_model || model;
 
     // 已经圈过道路 ROI 时，切换到 normal 后直接下发，不启动新的 VideoCapture。
-    if (model === 'normal' && state.normalRoi.confirmed && state.normalRoi.points.length >= 3) {
+    if (model === 'normal' && state.normalRoi.confirmed && state.normalRoi.points.length === 4) {
       await configureNormalRoiOnBackend();
     }
 
@@ -455,6 +483,7 @@ function applyBackendData(data) {
   state.parkingMonitor = result.parking_monitor || { active: [], alerts: [], zones: [], history: [] };
   state.normalLane = result.normal_lane || state.normalLane || {};
   state.normalRoadAnalysis = result.normal_road_analysis || state.normalRoadAnalysis || {};
+  state.normalAnomaly = result.road_anomaly || state.normalAnomaly || {};
   state.parkingHistory = Array.isArray(state.parkingMonitor.history) ? state.parkingMonitor.history : [];
   state.parkingAlerts = Number(result.parking_alert_count || (state.parkingMonitor.alerts || []).length || status.parking_alerts || 0);
   state.lastMessage = result.message || status.message || '后端运行中';
@@ -471,12 +500,12 @@ function applyBackendData(data) {
     { name: '田浩阳手机采集端', type: 'IP Webcam / Tailscale', ip: $('#cameraUrlInput')?.value || '100.70.11.30', status: running && status.source_type === 'camera' ? '在线检测中' : '待连接', className: running && status.source_type === 'camera' ? '' : 'training' },
     { name: '李俊发分析节点', type: 'Electron + Python Backend', ip: BACKEND_URL.replace('http://', ''), status: status.backend || 'unknown', className: status.backend === 'ready' ? '' : 'training' },
     { name: 'ONNX检测模型', type: `${detectorModelLabel(status.detector_model || state.detectorModel)} / ONNXRuntime`, ip: status.model_path || 'project root', status: yoloReady ? `实际 ${status.yolo_provider || ''}` : '未就绪', className: yoloReady ? '' : 'offline' },
-    { name: '车牌识别模型', type: 'PaddleOCR TextRecognition Tiny', ip: 'PP-OCRv6_tiny_rec', status: ocrReady ? `已加载 ${status.ocr_model || ''}` : '未就绪', className: ocrReady ? '' : 'offline' }
+    { name: '车牌识别模型', type: 'PaddleOCR TextRecognition Tiny', ip: 'PP-OCRv6_tiny_rec', status: ocrReady ? `已加载 ${status.ocr_model || ''} / ${status.ocr_device || 'gpu:0'} / PID ${status.ocr_process_pid || '-'}` : '未就绪', className: ocrReady ? '' : 'offline' }
   ];
 
   state.models = [
     { name: detectorModelLabel(status.detector_model || state.detectorModel), desc: `实际 ${status.yolo_provider || 'provider未知'} · ${status.model_path || 'project root'} · YOLO ${status.yolo_ms || 0}ms`, score: yoloReady ? '已加载' : '未就绪', active: yoloReady },
-    { name: 'PaddleOCR TextRecognition Tiny', desc: `轻量 OCR · 未稳定时最高约 4 次/秒，稳定后 2 秒复核 · ${status.ocr_ms || 0}ms`, score: ocrReady ? '已加载' : '未就绪', active: ocrReady },
+    { name: 'PaddleOCR TextRecognition Tiny', desc: `GPU 独立进程 OCR · ${status.ocr_runtime || '等待车牌模式加载'} · 未稳定时最高约 4 次/秒，稳定后 2 秒复核 · ${status.ocr_ms || 0}ms${status.ocr_error ? ' · ' + status.ocr_error : ''}`, score: ocrReady ? '已加载' : '未就绪', active: ocrReady },
     { name: '时序同步防拖影', desc: `模式：${status.sync_mode || 'auto'} · motion=${status.motion_score || 0} · YOLO实时框+OCR缓存复用`, score: '启用', active: true },
     { name: '性能监测诊断', desc: `pre ${status.yolo_pre_ms || 0}ms / infer ${status.yolo_infer_ms || 0}ms / post ${status.yolo_post_ms || 0}ms / encode ${status.encode_ms || 0}ms`, score: '监测中', active: true },
     { name: '多帧投票纠错', desc: '省份票 + 主体票 + 置信度权重，修正单帧波动', score: '启用', active: true },
@@ -719,7 +748,7 @@ function normalRoiSourceValue(sourceType) {
   return ($('#videoFilePath')?.value || state.selectedVideoPath || '').trim();
 }
 
-function invalidateNormalRoi(message = '尚未选择 ROI') {
+function invalidateNormalRoi(message = '尚未选择四点 ROI') {
   state.normalRoi.confirmed = false;
   state.normalRoi.source = '';
   state.normalRoi.points = [];
@@ -729,10 +758,25 @@ function invalidateNormalRoi(message = '尚未选择 ROI') {
   state.normalRoi.imageDataUrl = '';
   state.normalRoi.previewImage = null;
   state.normalRoi.drawRect = null;
+  state.normalAnomaly = {
+    ...state.normalAnomaly,
+    status: 'waiting_roi',
+    baseline_count: 0,
+    baseline_progress: 0,
+    baseline_ready: false,
+    candidate_count: 0,
+    confirmed_count: 0,
+    candidates: [],
+    confirmed: [],
+    tracks: [],
+    message
+  };
+  state.normalAnomalyEventKeys.clear();
+  state.normalAnomalySessionId = '';
   const status = $('#normalRoiStatus');
   if (status) {
     status.textContent = message;
-    status.classList.remove('ready');
+    status.classList.remove('ready', 'collecting', 'error');
   }
 }
 
@@ -742,16 +786,34 @@ function updateNormalRoiControls() {
   controls?.classList.toggle('hidden', !normalSelected);
 
   const status = $('#normalRoiStatus');
+  const rebuildButton = $('#rebuildNormalBaselineBtn');
+  if (rebuildButton) {
+    rebuildButton.disabled = !normalSelected || !state.workflowRunning || !state.normalRoi.confirmed;
+  }
   if (!status) return;
+
+  status.classList.remove('ready', 'collecting', 'error');
+  const anomaly = state.normalAnomaly || {};
+  const baselineStatus = String(anomaly.status || state.normalRoadAnalysis?.baseline_status || '');
+
   if (!normalSelected) {
     status.textContent = '仅 normal.onnx 模式可用';
-    status.classList.remove('ready');
-  } else if (state.normalRoi.confirmed) {
-    status.textContent = `ROI 已确认 · ${state.normalRoi.points.length} 个点`;
+  } else if (!state.normalRoi.confirmed || state.normalRoi.points.length !== 4) {
+    status.textContent = '尚未选择四点 ROI';
+  } else if (baselineStatus === 'collecting') {
+    const count = Number(anomaly.baseline_count || 0);
+    const target = Number(anomaly.baseline_target || 12);
+    status.textContent = `正常基准采集中 · ${count}/${target}`;
+    status.classList.add('collecting');
+  } else if (baselineStatus === 'error') {
+    status.textContent = '基准采集或异常检测失败';
+    status.classList.add('error');
+  } else if (Boolean(anomaly.baseline_ready)) {
+    status.textContent = `四点 ROI 已确认 · 基准 ${Number(anomaly.baseline_count || 0)} 张`;
     status.classList.add('ready');
   } else {
-    status.textContent = '尚未选择 ROI';
-    status.classList.remove('ready');
+    status.textContent = '四点 ROI 已确认 · 启动视频后采集基准';
+    status.classList.add('ready');
   }
 }
 
@@ -805,12 +867,12 @@ function drawNormalRoiSelector() {
       if (index === 0) ctx.moveTo(x, y);
       else ctx.lineTo(x, y);
     });
-    if (points.length >= 3) ctx.closePath();
+    if (points.length === 4) ctx.closePath();
     ctx.fillStyle = 'rgba(250, 204, 21, .20)';
-    if (points.length >= 3) ctx.fill();
+    if (points.length === 4) ctx.fill();
     ctx.strokeStyle = '#fde047';
     ctx.lineWidth = 3;
-    ctx.setLineDash(points.length >= 3 ? [] : [8, 6]);
+    ctx.setLineDash(points.length === 4 ? [] : [8, 6]);
     ctx.stroke();
     ctx.setLineDash([]);
 
@@ -834,9 +896,13 @@ function drawNormalRoiSelector() {
   const count = $('#normalRoiPointCount');
   if (count) count.textContent = `已选择 ${points.length} 个点`;
   const tip = $('#normalRoiTip');
-  if (tip) tip.textContent = points.length >= 3
-    ? '道路区域已闭合，可继续添加点或点击“确认道路区域”。'
-    : '请沿道路边界依次点击，至少选择 3 个点。';
+  if (tip) {
+    if (points.length === 4) {
+      tip.textContent = '四点道路区域已闭合，请点击“确认道路区域”。';
+    } else {
+      tip.textContent = `请沿道路边界依次点击严格 4 个点，当前 ${points.length}/4。`;
+    }
+  }
 }
 
 async function openNormalRoiSelector() {
@@ -902,6 +968,9 @@ function onNormalRoiCanvasClick(event) {
     y < drawRect.y || y > drawRect.y + drawRect.h
   ) return;
 
+  if ((state.normalRoi.draftPoints || []).length >= 4) {
+    return;
+  }
   const nx = Math.max(0, Math.min(1, (x - drawRect.x) / drawRect.w));
   const ny = Math.max(0, Math.min(1, (y - drawRect.y) / drawRect.h));
   state.normalRoi.draftPoints.push([Number(nx.toFixed(7)), Number(ny.toFixed(7))]);
@@ -919,7 +988,7 @@ function resetNormalRoiPoints() {
 }
 
 async function configureNormalRoiOnBackend() {
-  if (!state.normalRoi.confirmed || state.normalRoi.points.length < 3) return null;
+  if (!state.normalRoi.confirmed || state.normalRoi.points.length !== 4) return null;
   return fetchJson(`${BACKEND_URL}/api/normal/roi/configure`, {
     method: 'POST',
     body: JSON.stringify({ points: state.normalRoi.points })
@@ -928,21 +997,48 @@ async function configureNormalRoiOnBackend() {
 
 async function confirmNormalRoi() {
   const points = state.normalRoi.draftPoints || [];
-  if (points.length < 3) {
-    alert('正常道路 ROI 至少需要选择 3 个点。');
+  if (points.length !== 4) {
+    alert('道路异常 ROI 必须严格选择 4 个点。');
     return;
   }
   state.normalRoi.points = points.map(point => [...point]);
   state.normalRoi.confirmed = true;
+  state.normalAnomaly = {
+    ...state.normalAnomaly,
+    status: state.workflowRunning ? 'collecting' : 'waiting_start',
+    baseline_count: 0,
+    baseline_progress: 0,
+    baseline_ready: false,
+    candidate_count: 0,
+    confirmed_count: 0,
+    candidates: [],
+    confirmed: [],
+    tracks: [],
+    message: state.workflowRunning
+      ? '正在从当前视频源采集正常道路基准。'
+      : '启动视频后将从当前视频源采集正常道路基准。'
+  };
+  state.normalAnomalyEventKeys.clear();
+  state.normalAnomalySessionId = '';
   closeNormalRoiModal();
   updateNormalRoiControls();
 
   try {
     if (state.workflowRunning) {
       await configureNormalRoiOnBackend();
-      pushEvent('道路区域已更新', `已选择 ${points.length} 个顶点；直接复用当前视频连接，下一帧开始道路分析。`, '低', 'low');
+      pushEvent(
+        '四点道路区域已更新',
+        '视频连接保持不变；车道线与异常检测共用该 ROI，并开始实时采集新的正常道路基准。',
+        '低',
+        'low'
+      );
     } else {
-      pushEvent('道路区域已确认', `已选择 ${points.length} 个顶点，启动视频后会用于 normal.onnx 检测。`, '低', 'low');
+      pushEvent(
+        '四点道路区域已确认',
+        '启动视频后会先从当前视频源采集正常道路基准，再开始异常检测。',
+        '低',
+        'low'
+      );
     }
   } catch (error) {
     pushEvent('道路 ROI 下发失败', error.message, '高', 'high');
@@ -951,13 +1047,55 @@ async function confirmNormalRoi() {
 
 function requireNormalRoiForSource(sourceType, source) {
   if (!isNormalDetectorSelected()) return [];
-  if (!state.normalRoi.confirmed || state.normalRoi.points.length < 3) {
-    throw new Error('正常道路模式需要先点击“选择正常道路区域”，圈选至少 3 个点。');
+  if (!state.normalRoi.confirmed || state.normalRoi.points.length !== 4) {
+    throw new Error('道路异常模式需要先点击“选择四点道路区域”，严格圈选四个点。');
   }
   if (state.normalRoi.sourceType !== sourceType || state.normalRoi.source !== source) {
-    throw new Error('当前 ROI 与即将启动的视频来源不一致，请重新选择正常道路区域。');
+    throw new Error('当前 ROI 与即将启动的视频来源不一致，请重新选择四点道路区域。');
   }
   return state.normalRoi.points.map(point => [...point]);
+}
+
+async function rebuildNormalBaseline() {
+  if (!isNormalDetectorSelected()) {
+    pushEvent('无法重新采集基准', '请先切换到道路异常 normal.onnx 模式。', '高', 'high');
+    return;
+  }
+  if (!state.workflowRunning) {
+    pushEvent('无法重新采集基准', '请先启动本地视频或连接手机视频。', '高', 'high');
+    return;
+  }
+  if (!state.normalRoi.confirmed || state.normalRoi.points.length !== 4) {
+    pushEvent('无法重新采集基准', '请先选择严格四点道路 ROI。', '高', 'high');
+    return;
+  }
+
+  try {
+    await fetchJson(`${BACKEND_URL}/api/normal/baseline/rebuild`, {
+      method: 'POST',
+      body: JSON.stringify({ force: true })
+    });
+    state.normalAnomaly = {
+      ...state.normalAnomaly,
+      status: 'collecting',
+      baseline_count: 0,
+      baseline_progress: 0,
+      baseline_ready: false,
+      candidate_count: 0,
+      confirmed_count: 0,
+      candidates: [],
+      confirmed: [],
+      tracks: [],
+      message: '正在从当前视频源重新采集正常道路基准。'
+    };
+    state.normalAnomalyEventKeys.clear();
+    state.normalAnomalySessionId = '';
+    updateNormalRoiControls();
+    renderNormalRoadRuntime();
+    pushEvent('重新采集正常道路基准', '旧基准已清空，视频连接保持不变。', '低', 'low');
+  } catch (error) {
+    pushEvent('重新采集基准失败', error.message, '高', 'high');
+  }
 }
 
 async function startVideoWorkflow() {
@@ -1071,7 +1209,7 @@ function drawNormalRoadOverlay(ctx, rect) {
   const mapX = (x) => rect.x + Number(x || 0) * rect.scale;
   const mapY = (y) => rect.y + Number(y || 0) * rect.scale;
 
-  if (roi.length >= 3) {
+  if (roi.length === 4) {
     ctx.save();
     ctx.beginPath();
     roi.forEach((point, index) => {
@@ -1127,6 +1265,157 @@ function drawNormalRoadOverlay(ctx, rect) {
   });
 }
 
+function drawNormalLaneAssist() {
+  const canvas = $('#normalLaneCanvas');
+  const stage = $('#normalLaneStage');
+  const img = $('#liveFeed');
+  const empty = $('#normalLaneEmpty');
+  const badge = $('#normalLaneAssistBadge');
+
+  if (!canvas || !stage) return;
+
+  const { ctx, w: stageW, h: stageH } = resizeOverlayCanvas(canvas, stage);
+  ctx.clearRect(0, 0, stageW, stageH);
+  ctx.fillStyle = '#07111f';
+  ctx.fillRect(0, 0, stageW, stageH);
+
+  const normalSelected = isNormalDetectorSelected();
+  const hasFrame = Boolean(img && !img.classList.contains('hidden') && img.naturalWidth > 0 && img.naturalHeight > 0);
+  const srcW = state.frameWidth || img?.naturalWidth || 0;
+  const srcH = state.frameHeight || img?.naturalHeight || 0;
+  const laneCount = Number(state.normalLane?.stable_lane_count || 0);
+
+  if (!normalSelected || !hasFrame || !srcW || !srcH) {
+    empty?.classList.remove('hidden');
+    if (badge) badge.textContent = normalSelected ? '等待视频帧' : '仅 normal 模式';
+    return;
+  }
+
+  const rect = getImageContainRect(stageW, stageH, srcW, srcH);
+  try {
+    ctx.drawImage(img, rect.x, rect.y, rect.w, rect.h);
+  } catch (_) {
+    ctx.fillStyle = '#0b1a2d';
+    ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+  }
+
+  drawNormalRoadOverlay(ctx, rect);
+  empty?.classList.toggle('hidden', Boolean(state.normalRoi.confirmed || laneCount > 0));
+  if (badge) {
+    badge.textContent = laneCount > 0 ? `稳定车道线 ${laneCount} 条` : '车道线识别中';
+    badge.classList.toggle('ready', laneCount > 0);
+  }
+}
+
+async function refreshNormalDebugPreview(force = false) {
+  const image = $('#normalAnomalyMaskFeed');
+  const empty = $('#normalMaskEmpty');
+  const badge = $('#normalMaskAssistBadge');
+  if (!image) return;
+
+  const normalSelected = isNormalDetectorSelected();
+  if (!normalSelected || !state.workflowRunning) {
+    empty?.classList.remove('hidden');
+    image.classList.remove('ready');
+    if (badge) badge.textContent = normalSelected ? '等待视频启动' : '仅 normal 模式';
+    return;
+  }
+
+  const now = Date.now();
+  if (!force && (state.normalDebugBusy || now - state.normalDebugLastUpdate < 280)) return;
+  state.normalDebugBusy = true;
+
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/normal/debug.png?t=${now}`, {
+      cache: 'no-store'
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const blob = await response.blob();
+    if (!blob.size) throw new Error('empty image');
+
+    const nextUrl = URL.createObjectURL(blob);
+    const previousUrl = state.normalDebugObjectUrl;
+    image.onload = () => {
+      image.classList.add('ready');
+      empty?.classList.add('hidden');
+      if (previousUrl) URL.revokeObjectURL(previousUrl);
+    };
+    image.src = nextUrl;
+    state.normalDebugObjectUrl = nextUrl;
+    state.normalDebugLastUpdate = now;
+
+    const anomaly = state.normalAnomaly || {};
+    const confirmed = Number(anomaly.confirmed_count || 0);
+    const candidates = Number(anomaly.candidate_count || 0);
+    if (badge) {
+      badge.textContent = confirmed > 0
+        ? `红色异常 ${confirmed} 处`
+        : candidates > 0
+          ? `异常候选 ${candidates} 处`
+          : Boolean(anomaly.baseline_ready)
+            ? '差分图运行中'
+            : `基准 ${Number(anomaly.baseline_count || 0)}/${Number(anomaly.baseline_target || 12)}`;
+      badge.classList.toggle('danger', confirmed > 0);
+      badge.classList.toggle('ready', Boolean(anomaly.baseline_ready) && confirmed === 0);
+    }
+  } catch (_) {
+    empty?.classList.remove('hidden');
+    if (badge) badge.textContent = '差分图等待中';
+  } finally {
+    state.normalDebugBusy = false;
+  }
+}
+
+function drawRoadAnomalyOverlay(ctx, rect) {
+  if (!isNormalDetectorSelected()) return;
+  const anomaly = state.normalAnomaly || {};
+  const tracks = Array.isArray(anomaly.tracks)
+    ? anomaly.tracks
+    : [
+        ...(Array.isArray(anomaly.candidates) ? anomaly.candidates : []),
+        ...(Array.isArray(anomaly.confirmed) ? anomaly.confirmed : [])
+      ];
+
+  if (!tracks.length) return;
+
+  const mapX = (x) => rect.x + Number(x || 0) * rect.scale;
+  const mapY = (y) => rect.y + Number(y || 0) * rect.scale;
+
+  tracks.forEach((item) => {
+    const bbox = Array.isArray(item.bbox) ? item.bbox.map(Number) : [];
+    if (bbox.length < 4) return;
+    const [x1, y1, x2, y2] = bbox;
+    const px = mapX(x1);
+    const py = mapY(y1);
+    const pw = Math.max(3, (x2 - x1) * rect.scale);
+    const ph = Math.max(3, (y2 - y1) * rect.scale);
+    const confirmed = Boolean(item.confirmed);
+    const color = confirmed ? '#ff334f' : '#ffb020';
+    const label = confirmed
+      ? `道路异常 ${Number(item.duration_s || 0).toFixed(1)}s`
+      : `异常候选 ${Number(item.duration_s || 0).toFixed(1)}s`;
+
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = confirmed ? 4 : 2.5;
+    ctx.setLineDash(confirmed ? [] : [8, 5]);
+    ctx.shadowColor = color;
+    ctx.shadowBlur = confirmed ? 14 : 6;
+    ctx.strokeRect(px, py, pw, ph);
+    ctx.shadowBlur = 0;
+    ctx.setLineDash([]);
+
+    ctx.font = '800 13px Microsoft YaHei, system-ui, sans-serif';
+    const textWidth = Math.ceil(ctx.measureText(label).width) + 14;
+    const labelY = Math.max(rect.y + 2, py - 24);
+    ctx.fillStyle = confirmed ? 'rgba(190, 18, 60, .92)' : 'rgba(180, 83, 9, .90)';
+    ctx.fillRect(px, labelY, textWidth, 22);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(label, px + 7, labelY + 4);
+    ctx.restore();
+  });
+}
+
 function drawDetectionOverlay() {
   const canvas = $('#detectionOverlay');
   const stage = $('#videoStage');
@@ -1140,14 +1429,15 @@ function drawDetectionOverlay() {
   const { ctx, w: stageW, h: stageH } = resizeOverlayCanvas(canvas, stage);
   ctx.clearRect(0, 0, stageW, stageH);
 
-  const boxes = state.currentBoxes || [];
+  // normal 模式主画面只突出异常物体；车辆框与车道线全部移到下方辅助视图。
+  const boxes = isNormalDetectorSelected() ? [] : (state.currentBoxes || []);
   const srcW = state.frameWidth || img.naturalWidth || 0;
   const srcH = state.frameHeight || img.naturalHeight || 0;
 
   if (!srcW || !srcH) return;
 
   const rect = getImageContainRect(stageW, stageH, srcW, srcH);
-  drawNormalRoadOverlay(ctx, rect);
+  drawRoadAnomalyOverlay(ctx, rect);
 
   ctx.save();
   ctx.font = '700 13px Microsoft YaHei, system-ui, sans-serif';
@@ -1302,6 +1592,43 @@ function drawDetectionOverlay() {
 
   ctx.restore();
 }
+function registerNormalAnomalyEvents(anomaly) {
+  const sessionId = String(anomaly?.baseline_session_id || '');
+  if (sessionId && sessionId !== state.normalAnomalySessionId) {
+    state.normalAnomalySessionId = sessionId;
+    state.normalAnomalyEventKeys.clear();
+  }
+
+  const confirmed = Array.isArray(anomaly?.confirmed)
+    ? anomaly.confirmed
+    : (Array.isArray(anomaly?.tracks) ? anomaly.tracks.filter(item => item?.confirmed) : []);
+
+  confirmed.forEach((item) => {
+    const rawKey = item.event_id ?? item.track_id ?? `${item.bbox || ''}-${item.first_seen_s || ''}`;
+    const key = String(rawKey);
+    if (!key || state.normalAnomalyEventKeys.has(key)) return;
+    state.normalAnomalyEventKeys.add(key);
+
+    const bbox = Array.isArray(item.bbox) ? item.bbox.map(value => Math.round(Number(value || 0))) : [];
+    const position = bbox.length === 4 ? `位置 [${bbox.join(', ')}]` : '道路 ROI 内';
+    const duration = Number(item.duration_s || 0).toFixed(1);
+    const score = Number(item.mean_score || item.score || 0).toFixed(0);
+    pushEvent(
+      '道路异常已确认',
+      `${position}持续 ${duration}s，差异分数 ${score}。`,
+      '高',
+      'high'
+    );
+  });
+
+  state.anomalyCount = Number(
+    anomaly?.total_confirmed_events
+    ?? state.normalRoadAnalysis?.anomaly_total_events
+    ?? confirmed.length
+    ?? 0
+  );
+}
+
 async function refreshRealtimeOverlay() {
   const img = $('#liveFeed');
   if (!img || img.classList.contains('hidden')) return;
@@ -1314,14 +1641,26 @@ async function refreshRealtimeOverlay() {
       applyDetectorUi(state.detectorModel);
     }
     state.currentBoxes = pickBoxes(result);
-    state.vehicleCount = (state.detectorModel === 'vehicle') ? state.currentBoxes.length : ((result.detections || result.plates || []).length);
+    state.vehicleCount = (state.detectorModel === 'vehicle')
+      ? state.currentBoxes.length
+      : ((result.detections || result.plates || []).length);
     state.frameWidth = Number(result.frame_width || status.frame_width || state.frameWidth || 0);
     state.frameHeight = Number(result.frame_height || status.frame_height || state.frameHeight || 0);
     state.lastOverlayFrameId = Number(result.frame_id || state.lastOverlayFrameId || 0);
     state.normalLane = result.normal_lane || state.normalLane || {};
     state.normalRoadAnalysis = result.normal_road_analysis || state.normalRoadAnalysis || {};
+    state.normalAnomaly = result.road_anomaly || state.normalAnomaly || {};
+
+    if (isNormalDetectorSelected()) {
+      registerNormalAnomalyEvents(state.normalAnomaly);
+    }
+
+    updateNormalRoiControls();
     drawDetectionOverlay();
+    drawNormalLaneAssist();
+    refreshNormalDebugPreview(false);
     renderNormalRoadRuntime();
+    renderKpis();
   } catch (_) {
     // 高频 overlay 拉取失败不打断主状态轮询。
   }
@@ -1334,35 +1673,53 @@ function renderNormalRoadRuntime() {
 
   const lane = state.normalLane || {};
   const analysis = state.normalRoadAnalysis || {};
+  const anomaly = state.normalAnomaly || {};
   const normalSelected = isNormalDetectorSelected();
 
   if (!normalSelected) {
     target.innerHTML = `
-      <div class="normal-road-runtime-title">正常道路模式状态</div>
-      <div class="normal-road-runtime-body">当前检测模型不是 normal.onnx，车道线算法完全停用，不占用其他模式资源。</div>
+      <div class="normal-road-runtime-title">道路异常模式状态</div>
+      <div class="normal-road-runtime-body">当前不是 normal.onnx 模式，车道线与道路异常线程均停止，不占用其他模式资源。</div>
     `;
     target.classList.remove('active', 'warning');
     return;
   }
 
-  const roiReady = Boolean(analysis.roi_ready || (Array.isArray(lane.roi) && lane.roi.length >= 3) || state.normalRoi.confirmed);
+  const roiReady = Boolean(
+    analysis.roi_ready
+    || (Array.isArray(lane.roi) && lane.roi.length === 4)
+    || (state.normalRoi.confirmed && state.normalRoi.points.length === 4)
+  );
+  const baselineStatus = String(anomaly.status || analysis.baseline_status || 'waiting_roi');
+  const baselineCount = Number(anomaly.baseline_count || analysis.baseline_count || 0);
+  const baselineTarget = Number(anomaly.baseline_target || analysis.baseline_target || 12);
+  const baselineReady = Boolean(anomaly.baseline_ready || baselineStatus === 'ready');
   const stableCount = Number(lane.stable_lane_count || analysis.stable_lane_count || 0);
   const vehicleCount = Number(analysis.normal_vehicle_count || 0);
-  const unclassifiedCount = Number(analysis.inside_unclassified_count || 0);
-  const processingMs = Number(lane.processing_ms || 0).toFixed(1);
+  const candidateCount = Number(anomaly.candidate_count || analysis.anomaly_candidate_count || 0);
+  const confirmedCount = Number(anomaly.confirmed_count || analysis.anomaly_confirmed_count || 0);
+  const laneMs = Number(lane.processing_ms || 0).toFixed(1);
+  const anomalyMs = Number(anomaly.processing_ms || analysis.anomaly_processing_ms || 0).toFixed(1);
 
-  target.classList.toggle('active', roiReady && stableCount > 0);
-  target.classList.toggle('warning', roiReady && stableCount === 0);
+  let baselineText = '未开始';
+  if (baselineStatus === 'collecting') baselineText = `${baselineCount}/${baselineTarget}`;
+  else if (baselineReady) baselineText = `${baselineCount} 张`;
+  else if (roiReady) baselineText = '等待启动';
+
+  target.classList.toggle('active', baselineReady && confirmedCount === 0);
+  target.classList.toggle('warning', roiReady && (!baselineReady || candidateCount > 0 || confirmedCount > 0));
   target.innerHTML = `
-    <div class="normal-road-runtime-title">正常道路模式状态</div>
+    <div class="normal-road-runtime-title">车道线 + 实时道路异常检测</div>
     <div class="normal-road-runtime-grid">
-      <div><span>道路 ROI</span><b>${roiReady ? '已确认' : '未选择'}</b></div>
+      <div><span>四点道路 ROI</span><b>${roiReady ? '已确认' : '未选择'}</b></div>
+      <div><span>实时正常基准</span><b>${baselineText}</b></div>
       <div><span>稳定车道线</span><b>${stableCount}</b></div>
-      <div><span>ROI 内正常车辆</span><b>${vehicleCount}</b></div>
-      <div><span>其他模型目标</span><b>${unclassifiedCount}</b></div>
-      <div><span>OpenCV 耗时</span><b>${processingMs} ms</b></div>
+      <div><span>ROI 内车辆</span><b>${vehicleCount}</b></div>
+      <div><span>异常候选</span><b>${candidateCount}</b></div>
+      <div><span>确认异常</span><b>${confirmedCount}</b></div>
+      <div><span>处理耗时</span><b>${laneMs}/${anomalyMs} ms</b></div>
     </div>
-    <div class="normal-road-runtime-body">${analysis.message || lane.message || '等待正常道路检测结果。'}</div>
+    <div class="normal-road-runtime-body">${anomaly.message || analysis.message || lane.message || '等待道路异常检测结果。'}</div>
   `;
 }
 
@@ -2069,6 +2426,7 @@ function updateSection(section) {
     drawHeatmap();
     if (section === 'history') drawTrend();
     drawDetectionOverlay();
+    drawNormalLaneAssist();
   });
 }
 
@@ -2087,6 +2445,7 @@ function renderAll() {
   drawHeatmap();
   drawTrend();
   drawDetectionOverlay();
+  drawNormalLaneAssist();
   renderNormalRoadRuntime();
   updateNormalRoiControls();
 }
@@ -2101,6 +2460,7 @@ function bindEvents() {
   $('#stopWorkflowBtn')?.addEventListener('click', stopWorkflow);
   $('#restartBackendBtn')?.addEventListener('click', restartBackend);
   $('#selectNormalRoiBtn')?.addEventListener('click', openNormalRoiSelector);
+  $('#rebuildNormalBaselineBtn')?.addEventListener('click', rebuildNormalBaseline);
   $('#normalRoiCanvas')?.addEventListener('click', onNormalRoiCanvasClick);
   $('#normalRoiUndoBtn')?.addEventListener('click', undoNormalRoiPoint);
   $('#normalRoiResetBtn')?.addEventListener('click', resetNormalRoiPoints);
@@ -2151,6 +2511,7 @@ window.addEventListener('resize', () => {
   drawHeatmap();
   drawTrend();
   drawDetectionOverlay();
+  drawNormalLaneAssist();
   if (!$('#normalRoiModal')?.classList.contains('hidden')) drawNormalRoiSelector();
 });
 
@@ -2169,6 +2530,7 @@ setInterval(() => {
 
 // 高频轻量拉取：只更新 Canvas 框，不重绘整个页面。
 setInterval(refreshRealtimeOverlay, 100);
+setInterval(() => refreshNormalDebugPreview(false), 360);
 
 
 

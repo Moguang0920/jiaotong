@@ -335,6 +335,165 @@ p { margin: 6px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
   background: #071020;
 }
 
+.normal-visual-diagnostics {
+  display: none;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(125, 167, 214, .15);
+}
+
+body[data-active-section="monitor"][data-detector-model="normal"] .normal-visual-diagnostics {
+  display: block;
+}
+
+.normal-diagnostic-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.normal-diagnostic-heading h3 {
+  margin: 0;
+  color: #eef7ff;
+  font-size: 15px;
+}
+
+.normal-diagnostic-heading p {
+  margin: 5px 0 0;
+  color: #8fa8c5;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.normal-diagnostic-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px 12px;
+  color: #a9bdd5;
+  font-size: 10px;
+}
+
+.normal-diagnostic-legend span {
+  width: 8px;
+  height: 8px;
+  margin-right: -6px;
+  border-radius: 999px;
+  box-shadow: 0 0 10px currentColor;
+}
+
+.lane-legend-dot { color: #39ff88; background: #39ff88; }
+.road-legend-dot { color: #38bdf8; background: #38bdf8; }
+.anomaly-legend-dot { color: #ff334f; background: #ff334f; }
+
+.normal-diagnostic-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.normal-diagnostic-card {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid rgba(125, 167, 214, .17);
+  border-radius: 16px;
+  background: rgba(6, 17, 31, .72);
+}
+
+.normal-diagnostic-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 62px;
+  padding: 11px 12px;
+  border-bottom: 1px solid rgba(125, 167, 214, .12);
+}
+
+.normal-diagnostic-card-head b {
+  display: block;
+  color: #ecf7ff;
+  font-size: 12px;
+}
+
+.normal-diagnostic-card-head span {
+  display: block;
+  margin-top: 5px;
+  color: #829bb9;
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.normal-diagnostic-card-head em {
+  flex: 0 0 auto;
+  padding: 5px 8px;
+  border: 1px solid rgba(250, 204, 21, .22);
+  border-radius: 999px;
+  background: rgba(250, 204, 21, .08);
+  color: #fde68a;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.normal-diagnostic-card-head em.ready {
+  border-color: rgba(52, 211, 153, .28);
+  background: rgba(52, 211, 153, .09);
+  color: #86efac;
+}
+
+.normal-diagnostic-card-head em.danger {
+  border-color: rgba(255, 51, 79, .38);
+  background: rgba(255, 51, 79, .12);
+  color: #ff9aaa;
+}
+
+.normal-lane-stage,
+.normal-mask-stage {
+  position: relative;
+  min-height: 230px;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: #07111f;
+}
+
+.normal-lane-stage canvas,
+.normal-mask-stage img {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.normal-mask-stage img {
+  object-fit: contain;
+  opacity: 0;
+  transition: opacity .18s ease;
+  image-rendering: auto;
+}
+
+.normal-mask-stage img.ready { opacity: 1; }
+
+.normal-diagnostic-empty {
+  position: absolute;
+  z-index: 3;
+  left: 50%;
+  top: 50%;
+  width: min(82%, 360px);
+  transform: translate(-50%, -50%);
+  color: rgba(181, 204, 230, .74);
+  font-size: 11px;
+  line-height: 1.6;
+  text-align: center;
+  pointer-events: none;
+}
+
+.normal-diagnostic-empty.hidden { display: none; }
+
 .road-scene {
   position: absolute;
   inset: 0;
@@ -903,7 +1062,7 @@ tr:hover td { background: rgba(255,255,255,.03); }
 .normal-roi-controls {
   flex: 1 0 100%;
   display: grid;
-  grid-template-columns: minmax(260px, 1fr) minmax(210px, 270px) auto auto;
+  grid-template-columns: minmax(250px, 1fr) minmax(200px, 250px) auto auto auto;
   gap: 12px;
   align-items: center;
   margin-top: 4px;
@@ -920,6 +1079,14 @@ tr:hover td { background: rgba(255,255,255,.03); }
 .normal-roi-copy span { display: block; color: #9fb5d4; font-size: 11px; line-height: 1.55; }
 .normal-roi-source { min-width: 210px; }
 .normal-roi-button { border-color: rgba(250, 204, 21, .34); color: #fde68a; }
+.normal-baseline-button {
+  border-color: rgba(56, 189, 248, .34);
+  color: #7dd3fc;
+}
+.normal-baseline-button:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
 .normal-roi-status {
   display: inline-flex;
   align-items: center;
@@ -938,6 +1105,16 @@ tr:hover td { background: rgba(255,255,255,.03); }
   color: #72f2b9;
   border-color: rgba(34, 197, 94, .4);
   background: rgba(34, 197, 94, .08);
+}
+.normal-roi-status.collecting {
+  color: #fde68a;
+  border-color: rgba(250, 204, 21, .42);
+  background: rgba(250, 204, 21, .08);
+}
+.normal-roi-status.error {
+  color: #fda4af;
+  border-color: rgba(251, 113, 133, .42);
+  background: rgba(251, 113, 133, .08);
 }
 
 .normal-roi-modal {
@@ -1036,7 +1213,7 @@ tr:hover td { background: rgba(255,255,255,.03); }
 .normal-road-runtime-title { color: #eaf4ff; font-size: 14px; font-weight: 800; margin-bottom: 10px; }
 .normal-road-runtime-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(100px, 1fr));
+  grid-template-columns: repeat(7, minmax(90px, 1fr));
   gap: 8px;
   margin-bottom: 10px;
 }
@@ -1503,4 +1680,9 @@ body[data-active-section="monitor"][data-detector-model="normal"] .anomaly-panel
   .plate-vote-summary { grid-template-columns: 1fr; }
   .plate-vote-card { align-items: flex-start; }
   .plate-vote-number { font-size: 21px; }
+  .normal-diagnostic-heading { flex-direction: column; }
+  .normal-diagnostic-legend { justify-content: flex-start; }
+  .normal-diagnostic-grid { grid-template-columns: 1fr; }
+  .normal-lane-stage,
+  .normal-mask-stage { min-height: 200px; }
 }

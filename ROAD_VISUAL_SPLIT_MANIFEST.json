@@ -1,0 +1,46 @@
+{
+  "version": "2026-07-14-NORMAL-VISUAL-SPLIT-V1",
+  "purpose": "主视频仅显示道路异常；下方独立显示车道线和蓝/红差分辅助图。",
+  "files": [
+    {
+      "path": "README_道路辅助视图替换说明.txt",
+      "size": 2341,
+      "sha256": "d115207bf67041fadb3521bd85904ba30d6152f186aed9a1a04615c96985b282"
+    },
+    {
+      "path": "backend/plate_runtime_backend.py",
+      "size": 195862,
+      "sha256": "5981510f5288825df19a875c522306a95fa7b31df641653b0c91642fd0cad4fb"
+    },
+    {
+      "path": "backend/runtime_road_anomaly_detector.py",
+      "size": 47520,
+      "sha256": "ef955a6ce85fd5810a6c671f27c301ef89fc4fc7225e0a2a3ed2ff4553f2276e"
+    },
+    {
+      "path": "frontend/dashboard.html",
+      "size": 22624,
+      "sha256": "a7ecf4c2116fc8521b44ade635020160f3ddafd9d2dde7be5e959551e81c61f3"
+    },
+    {
+      "path": "frontend/renderer.js",
+      "size": 99162,
+      "sha256": "a7ff6a97eee0d5f2aa2019e505461b303f71e4cbca6e4faa4fb1a4038add2aef"
+    },
+    {
+      "path": "frontend/styles.css",
+      "size": 45884,
+      "sha256": "0edfeb5fee0e1586ee55322d459aa897655e578741727be720e1cf237f1a9e3f"
+    },
+    {
+      "path": "multi_reference_road_anomaly_demo.py",
+      "size": 69399,
+      "sha256": "12f7f0ce9f045960ba94006880b73e6682cf7af2b331dad99a884c8df7e476ad"
+    },
+    {
+      "path": "verify_road_visual_split.py",
+      "size": 1884,
+      "sha256": "67dfd3788934d9aae9b767496218ff2c0ba2004119b1192a61917d7f73a5a007"
+    }
+  ]
+}

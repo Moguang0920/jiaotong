@@ -1,0 +1,41 @@
+{
+  "version": "2026-07-14-OCR-CPU-V4",
+  "strategy": "ONNX/PyTorch CUDA + PaddleOCR CPU",
+  "files": [
+    {
+      "path": "README_PaddleOCR_CPU修复V4.txt",
+      "size": 1007,
+      "sha256": "c350c769d4f249e1a75f86ed227c2bc8168c3d0934bfc59cbd654030de64702b"
+    },
+    {
+      "path": "backend/plate_runtime_backend.py",
+      "size": 194766,
+      "sha256": "b809f725a938ecda69cfb274ac1df56d7c924df7b64fbcaa532fddf54fde3c18"
+    },
+    {
+      "path": "fix_paddleocr_cpu.bat",
+      "size": 1717,
+      "sha256": "9424548a515f75eee955d081eb784ecd074c5aa3a55ae944a971a550a453b2b7"
+    },
+    {
+      "path": "frontend/renderer.js",
+      "size": 95016,
+      "sha256": "7ab04f35233521ac9c9230a9090e8ae1888bfcb14c5596f674464e55c5d75337"
+    },
+    {
+      "path": "tools/install_environment.py",
+      "size": 11041,
+      "sha256": "07b23beb17536511814d4456367b8fb7ed34b12b71793b05b12fe971223c5293"
+    },
+    {
+      "path": "tools/test_paddleocr_cpu.py",
+      "size": 1135,
+      "sha256": "6a55921a6662f228569f13649c989694a85f7fbfdebdcd2f79b5c645f51676d3"
+    },
+    {
+      "path": "tools/verify_environment.py",
+      "size": 6570,
+      "sha256": "5637560694e6cbe95fa3acd6cb8e0c75a8c407d3007ca49a16769956b4fd47c6"
+    }
+  ]
+}
